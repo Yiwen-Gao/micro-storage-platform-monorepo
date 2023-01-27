@@ -6,11 +6,12 @@ pragma solidity >=0.7.0 <0.9.0;
 contract StorageDeal {
     address owner;
     address user;
-    address[24] dailySchedule;
+    address[24][] dailySchedule;
     uint hourlyReward;
     uint totalFinalReward;
+    mapping(address => bool) participatingNodes;
 
-    constructor (address _user, uint dealDays, uint _hourlyReward, uint _totalFinalReward, address[24] memory _dailySchedule) payable {
+    constructor (address _user, uint dealDays, uint _hourlyReward, uint _totalFinalReward, address[24][] memory _dailySchedule) payable {
         uint totalHourlyReward = 24 * _hourlyReward * dealDays;
         require(msg.value >= totalHourlyReward + _totalFinalReward, "insufficient tokens to fund deal");
 
@@ -19,22 +20,25 @@ contract StorageDeal {
         hourlyReward = _hourlyReward;
         totalFinalReward = _totalFinalReward;
         dailySchedule = _dailySchedule;
+        for (uint i = 0; i < _dailySchedule.length; i++) {
+            for (uint j = 0; j < _dailySchedule[i].length; j++) {
+                address node = _dailySchedule[i][j];
+                participatingNodes[node] = true;
+            }
+        }
     }
 
     function checkIsDealParticipant(address node) view private {
-        for (uint i = 0; i < dailySchedule.length; i++) {
-            if (dailySchedule[i] == node) {
-                return;
-            }
-        }
-        require(false, "node isn't a deal participant");
+        require(participatingNodes[node], "node isn't a deal participant");
     }
 
     function replaceNode(address oldNode, address newNode) public {
         require(msg.sender == owner, "unauthorized caller");
         for (uint i = 0; i < dailySchedule.length; i++) {
-            if (dailySchedule[i] == oldNode) {
-                dailySchedule[i] = newNode;
+            for (uint j = 0; j < dailySchedule[i].length; j++) {
+                if (dailySchedule[i][j] == oldNode) {
+                    dailySchedule[i][j] = newNode;
+                }
             }
         }
     }
@@ -64,9 +68,12 @@ contract StorageDeal {
     function sendFinalReward(address node) public {
         checkIsDealParticipant(msg.sender);
         uint dailyHours = 0;
+        // TODO move this computation off chain
         for (uint i = 0; i < dailySchedule.length; i++) {
-            if (dailySchedule[i] == node) {
-                dailyHours++;
+            for (uint j = 0; j < dailySchedule[i].length; j++) {
+                if (dailySchedule[i][j] == node) {
+                    dailyHours++;
+                }
             }
         }
         require(dailyHours <= 24, "daily hours must be less than or equal to 24");
