@@ -1,2 +1,10 @@
+# editors
 .idea/
+.vscode/
+
+# node
 */node_modules/
+
+# hardhat
+*/artifacts/
+*/cache/

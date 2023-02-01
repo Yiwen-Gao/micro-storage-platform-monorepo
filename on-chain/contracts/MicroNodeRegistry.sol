@@ -2,6 +2,8 @@
 
 pragma solidity >=0.7.0 <0.9.0;
 
+import "hardhat/console.sol";
+
 // This contract stores all the nodes that have registered as part of the platform.
 // It tracks their history for a reputation system, which should persist between storage deals and incentivize good behavior.
 contract MicroNodeRegistry {
@@ -31,8 +33,10 @@ contract MicroNodeRegistry {
     function getRating(address node) external view returns (uint) {
         WorkLog storage log = history[node];
         require(log.elapsedHours > 0, "no history for node");
-        // The rating is a percentage between 0 and 1, but we multiply by 100 because Solidity doesn't allow fractions.
-        return log.fulfilledHours / log.elapsedHours * 100;
+        // We have to multiply the rating by 100 because Solidity doesn't allow fractions.
+        // This means it'll be an integer between 0 and 100.
+        console.log("getRating", log.fulfilledHours, log.elapsedHours);
+        return 100 * log.fulfilledHours / log.elapsedHours;
     }
 
     // Fulfilled hours can be used to weight the rating. 
