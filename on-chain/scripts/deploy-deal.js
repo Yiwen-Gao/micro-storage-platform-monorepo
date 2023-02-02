@@ -1,13 +1,14 @@
 const { ethers } = require("hardhat");
 
-async function main() {
+async function main(clientAddress, nodeSchedule, dealDuration) {
     const [deployer] = await ethers.getSigners();
     console.log("Deployer address:", deployer.address);
     console.log("Account balance:", (await deployer.getBalance()).toString());
     const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, ethers.provider);
-    const MicroNodeRegistry = await ethers.getContractFactory("MicroNodeRegistry", wallet);
-    const registry = await MicroNodeRegistry.deploy();
-    console.log("Contract address:", registry.address);
+    
+    const StorageDeal = await ethers.getContractFactory("StorageDeal", wallet);
+    const deal = await StorageDeal.deploy(clientAddress, nodeSchedule, dealDuration);
+    console.log("Contract address:", deal.address);
 }
 
 main()
@@ -16,3 +17,5 @@ main()
         console.error(error);
         process.exit(1);
     });
+
+exports.deploy = main;

@@ -1,6 +1,7 @@
 ### Setup
 ```
 npm install
+npx hardhat compile
 ```
 
 ### Testing
@@ -16,5 +17,5 @@ export PRIVATE_KEY=123
 ```
 - Use the deployment file
 ```zsh
-npx hardhat run scripts/deploy.js --network hyperspace
+npx hardhat run scripts/deploy-<contract>.js --network hyperspace
 ```
