@@ -11,3 +11,12 @@ Since `lotus` is a submodule, run
 git submodule update --init
 ```
 to initialize and fetch the code.
+
+### Generating Proofs
+Currently supports files of size <= 512MiB
+```zsh
+cd lotus
+make lotus-bench
+./lotus-bench sealData /your/path/file
+./lotus-bench windowPost 1
+```
