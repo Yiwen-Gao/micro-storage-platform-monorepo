@@ -55,7 +55,7 @@ contract StorageDeal {
      * @param _hourlySegmentReward tokens to be paid to each node every hour while deal is ongoing
      * @param _totalFinalReward total tokens to be split and paid to all nodes at end of deal
      * @param _dailySchedule matrix of committed nodes for each hour of the day
-     * @param _verifier external contract to validate poRep (proof of replication) and poSTs (proof of spacetime)
+     * @param _verifier external contract to validate poRep (proof of replication) and poSts (proof of spacetime)
      * @param poRep initial proof of replication to be validated
      */
     constructor (
@@ -82,8 +82,7 @@ contract StorageDeal {
     }
 
     function setParticipants() private {
-        uint numSegments = dailySchedule[0].length;
-        require(numSegments > 0, "need at least one segment per hour");
+        uint numSegments = getNumSegments();
         for (uint i = 0; i < dailySchedule.length; i++) {
             require(numSegments == dailySchedule[i].length, "number of segments needs to be the same per hour");
             for (uint j = 0; j < dailySchedule[i].length; j++) {
@@ -100,30 +99,51 @@ contract StorageDeal {
         require(accepted, "invalid proof of replication");
     }
 
+    function getNumSegments() view private returns (uint) {
+        uint numSegments = dailySchedule[0].length;
+        require(numSegments > 0, "need at least one segment per hour");
+        return numSegments;
+    }
+
     function startDeal() external payable {
         require(msg.sender == user, "unauthorized caller");
         require(dealStatus == Status.PENDING, "storage deal isn't pending");
 
-        uint totalHourlyReward = 24 * hourlySegmentReward * dealDuration;
-        require(msg.value >= totalHourlyReward + totalFinalReward, "insufficient tokens to fund deal");
+        uint totalDailyReward = 24 * hourlySegmentReward * getNumSegments();
+        uint totalReward = (dealDuration * totalDailyReward) + totalFinalReward;
+        // TODO we may want to take gas into account too.
+        require(msg.value >= totalReward, "insufficient tokens to fund deal");
+        console.log(msg.value, totalReward);
         startTime = block.timestamp;
         dealStatus = Status.IN_PROGRESS;
     }
 
-    function validateOngoingDeal(address node) view private {
-        require(block.timestamp - startTime <= dealDuration * 1 days, "storage deal's end time has passed");
-        require(dealStatus == Status.IN_PROGRESS, "storage deal isn't in progress");
-        require(participants[node].isParticipant, "node isn't a deal participant");
-    }
-
-    function submitPoST(string memory proof) external {
-        validateOngoingDeal(msg.sender);
-        bool accepted = verifier.verifyPoST(proof);
+    function submitPoSt(string memory proof) external {
+        validateOngoingDeal();
+        validateNodeCommitmentToHour(msg.sender);
+        bool accepted = verifier.verifyPoSt(proof);
         require(accepted, "invalid proof of spacetime");
         
+        // TODO @ygao make sure nodes can't submit twice in the same hour
         uint fulfillments = getHourlyFulfillments(msg.sender);
         recordFulfillments(msg.sender, fulfillments);
         sendHourlyReward(msg.sender, fulfillments);
+    }
+
+    function validateOngoingDeal() view private {
+        require(block.timestamp - startTime <= dealDuration * 1 days, "storage deal's end time has passed");
+        require(dealStatus == Status.IN_PROGRESS, "storage deal isn't in progress");
+    }
+
+    function validateNodeCommitmentToHour(address node) view private {
+        require(participants[node].isParticipant, "node isn't a deal participant");
+        uint currHour = (block.timestamp / 1000 / 60 seconds / 60 minutes) % 24;
+        for (uint j = 0; j < dailySchedule[currHour].length; j++) {
+            if (node == dailySchedule[currHour][j]) {
+                return;
+            }
+        }
+        require(false, "node isn't committed to the current hour");
     }
 
     function getHourlyFulfillments(address node) view private returns (uint) {
@@ -148,8 +168,8 @@ contract StorageDeal {
     }
 
     function replaceNode(address oldNode, address newNode) public {
-        validateOngoingDeal(oldNode);
         require(msg.sender == owner, "unauthorized caller");
+        validateOngoingDeal();
         for (uint i = 0; i < dailySchedule.length; i++) {
             for (uint j = 0; j < dailySchedule[i].length; j++) {
                 if (dailySchedule[i][j] == oldNode) {
@@ -165,14 +185,7 @@ contract StorageDeal {
         require(msg.sender == owner, "unauthorized caller");
         require(dealStatus == Status.IN_PROGRESS, "storage deal isn't in progress");
         
-        uint totalCommitments = 0;
-        for (uint i = 0; i < dailySchedule.length; i++) {
-            for (uint j = 0; j < dailySchedule[i].length; j++) {
-                address node = dailySchedule[i][j];
-                totalCommitments += participants[node].commitments;
-            }
-        }
-
+        uint totalCommitments = dealDuration * 24 * getNumSegments();
         for (uint i = 0; i < dailySchedule.length; i++) {
             for (uint j = 0; j < dailySchedule[i].length; j++) {
                 address node = dailySchedule[i][j];
@@ -181,14 +194,14 @@ contract StorageDeal {
         }
 
         // If there are remaining funds, that means either: 
-        //      1) the user overpaid up front 
-        //      2) or some nodes weren't fully compensated because they didn't fulfill the storage they committed to.
+        //  1) the user overpaid up front 
+        //  2) or some nodes weren't fully compensated because they didn't fulfill the storage they committed to.
         // We should send these tokens back to the user.
         payable(user).transfer(address(this).balance);
         dealStatus = Status.COMPLETE;
     }
 
-    // The final reward for each node is the fraction of its fulfillments over the total commitments by all nodes.
+    // The final reward for each node is based on the fraction of its fulfillments over the total commitments by all nodes.
     function sendFinalReward(address node, uint totalCommitments) private {
         WorkLog storage log = participants[node];
         if (!log.isParticipant) {

@@ -9,7 +9,7 @@ contract ProofVerifier {
     }
 
     // TODO call Filecoin's storage miner actor
-    function verifyPoST(string memory proof) pure external returns (bool) {
+    function verifyPoSt(string memory proof) pure external returns (bool) {
         return true;
     }
 }
