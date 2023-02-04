@@ -1,25 +1,37 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
+const { loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
 
 describe("MicroNodeRegistry contract", function() {
-    it("should only allow owner to add hours", async function() {
-        const [_, other] = await ethers.getSigners();
+    async function deploy() {
+        const [owner, node1] = await ethers.getSigners();
         const MicroNodeRegistry = await ethers.getContractFactory("MicroNodeRegistry");
         const registry = await MicroNodeRegistry.deploy();
 
-        await expect(registry.connect(other).addHours(other.address, 1, 1)).to.be.reverted;
+        return { owner, node1, registry };
+    }
+
+    it("should only allow owner to activate and deactivate nodes", async function() {
+        const { node1, registry } = await loadFixture(deploy);
+
+        await expect(registry.connect(node1).activateNode(node1.address)).to.be.reverted;
+        await expect(registry.connect(node1).deactivateNode(node1.address)).to.be.reverted;
     });
 
-    it("should calculate node reputation", async function() {
-        const [_, node1, node2] = await ethers.getSigners();
-        const MicroNodeRegistry = await ethers.getContractFactory("MicroNodeRegistry");
-        const registry = await MicroNodeRegistry.deploy();
+    it("should give defaults if no work history", async function() {
+        const { node1, registry } = await loadFixture(deploy);
 
-        registry.addHours(node1.address, 1, 2);
+        await registry.activateNode(node1.address);
+        expect(await registry.getRating(node1.address)).to.be.equal(90);
+        expect(await registry.getFulfilledHours(node1.address)).to.equal(1);
+    })
+
+    it("should calculate reputation based on hours", async function() {
+        const { node1, registry } = await loadFixture(deploy);
+
+        await registry.activateNode(node1.address);
+        await registry.addHours(node1.address, 1, 2);
         expect(await registry.getRating(node1.address)).to.equal(50);
         expect(await registry.getFulfilledHours(node1.address)).to.equal(1);
-        
-        await expect(registry.getRating(node2.address)).to.be.reverted;
-        expect(await registry.getFulfilledHours(node2.address)).to.equal(0);
     });
 });

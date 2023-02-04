@@ -9,7 +9,7 @@ npx hardhat compile
 npx hardhat test
 ```
 
-### Deployment
+### Deploying
 - Fund your wallet address with tFIL
 - Set your private key as an environment variable
 ```zsh
