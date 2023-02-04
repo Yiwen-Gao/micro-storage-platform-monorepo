@@ -8,7 +8,7 @@ Decentralization + democratization.
 ### Setup
 Since `lotus` is a submodule, run
 ```zsh
-git submodule update --init
+git submodule update --init --recursive
 ```
 to initialize and fetch the code.
 
