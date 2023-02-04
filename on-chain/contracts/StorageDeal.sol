@@ -2,12 +2,12 @@
 
 pragma solidity >=0.7.0 <0.9.0;
 
-import "./ProofVerifier.sol";
+import "./ProofHistory.sol";
 import "hardhat/console.sol";
 
 // This contract represents one storage deal. A new instance should be deployed on chain for each deal that's brokered.
 contract StorageDeal {
-    enum Status{ PENDING, IN_PROGRESS, COMPLETE }
+    enum Status { PENDING, IN_PROGRESS, COMPLETE }
     struct WorkLog {
         bool isParticipant;
         // This is the number of fulfilled commitments a node has delivered on. 
@@ -25,17 +25,18 @@ contract StorageDeal {
     // The outer array contains 24 inner arrays, one for each hour of the day.
     // An inner array represents how the data is divided between the nodes for the hour.
     // (Each inner array should be the same length, but this will differ for different storage deals based on the user's data size.)
-    // If the same node appears in an inner array multiple times, that means it's committed to multiple segments of the user's data.
+    // If the same node appears in an inner array multiple times, that means it's committed to multiple micro-sectors of the user's data.
+    // At the moment, each micro-sector is 512MiB, but this may change in the future.
     //
-    // Consider a sample schedule where the user wants to store four segments of data:
-    // Hour of Day    || Segment 1 | Segment 2 | Segment 3 | Segment 4
+    // Consider a sample schedule where the user wants to store four micro-sectors of data:
+    // Hour of Day    || mSector 1 | mSector 2 | mSector 3 | mSector 4
     // ===============================================================
     // 0 (12AM - 1AM) || node 1    | node 1    | node 1    | node 2
     // 1 (1AM -  2AM) || node 1    | node 2    | node 3    | node 4
     // 2 (2AM -  3AM) || node 2    | node 2    | node 3    | node 4
     // (And so on for the rest of the day...)
     //
-    // For the first hour, node1 is storing three of the four segments and node2 is storing one.
+    // For the first hour, node1 is storing three of the four micro-sectors and node2 is storing one.
     // If we sum up the commitments for the first three hours, node1: 4, node2: 4, node3 : 2, and node4: 2.
     address[][24] public dailySchedule;
     mapping(address => WorkLog) public participants;
@@ -47,7 +48,9 @@ contract StorageDeal {
     uint dealDuration; 
     // Some functions can only be called if the deal has a certain status
     Status dealStatus;
-    ProofVerifier verifier;
+
+    ProofHistory proofHistory;
+    address proofVerifier;
 
     /**
      * @param _user client who wishes to store data with the network
@@ -77,14 +80,13 @@ contract StorageDeal {
         dealStatus = Status.PENDING;
 
         setParticipants();
-        verifier = ProofVerifier(_verifier);
-        submitPoRep(poRep);
+        proofHistory = new ProofHistory(poRep, dailySchedule);
     }
 
     function setParticipants() private {
-        uint numSegments = getNumSegments();
+        uint numMicroSectors = getNumMicroSectors();
         for (uint i = 0; i < dailySchedule.length; i++) {
-            require(numSegments == dailySchedule[i].length, "number of segments needs to be the same per hour");
+            require(numMicroSectors == dailySchedule[i].length, "number of micro-sectors needs to be the same per hour");
             for (uint j = 0; j < dailySchedule[i].length; j++) {
                 address node = dailySchedule[i][j];
                 WorkLog storage log = participants[node];
@@ -94,22 +96,17 @@ contract StorageDeal {
         }
     }
 
-    function submitPoRep(string memory proof) view private {
-        bool accepted = verifier.verifyPoRep(proof);
-        require(accepted, "invalid proof of replication");
-    }
-
-    function getNumSegments() view private returns (uint) {
-        uint numSegments = dailySchedule[0].length;
-        require(numSegments > 0, "need at least one segment per hour");
-        return numSegments;
+    function getNumMicroSectors() view private returns (uint) {
+        uint numMicroSectors = dailySchedule[0].length;
+        require(numMicroSectors > 0, "need at least one segment per hour");
+        return numMicroSectors;
     }
 
     function startDeal() external payable {
         require(msg.sender == user, "unauthorized caller");
         require(dealStatus == Status.PENDING, "storage deal isn't pending");
 
-        uint totalDailyReward = 24 * hourlySegmentReward * getNumSegments();
+        uint totalDailyReward = 24 * hourlySegmentReward * getNumMicroSectors();
         uint totalReward = (dealDuration * totalDailyReward) + totalFinalReward;
         // TODO we may want to take gas into account too.
         require(msg.value >= totalReward, "insufficient tokens to fund deal");
@@ -118,16 +115,10 @@ contract StorageDeal {
         dealStatus = Status.IN_PROGRESS;
     }
 
-    function submitPoSt(string memory proof) external {
+    function submitPoSts(string[] memory proofs) external {
         validateOngoingDeal();
         validateNodeCommitmentToHour(msg.sender);
-        bool accepted = verifier.verifyPoSt(proof);
-        require(accepted, "invalid proof of spacetime");
-        
-        // TODO @ygao make sure nodes can't submit twice in the same hour
-        uint fulfillments = getHourlyFulfillments(msg.sender);
-        recordFulfillments(msg.sender, fulfillments);
-        sendHourlyReward(msg.sender, fulfillments);
+        proofHistory.recordPoStSubmission(msg.sender, proofs);
     }
 
     function validateOngoingDeal() view private {
@@ -146,16 +137,15 @@ contract StorageDeal {
         require(false, "node isn't committed to the current hour");
     }
 
-    function getHourlyFulfillments(address node) view private returns (uint) {
-        uint currHour = (block.timestamp / 1000 / 60 seconds / 60 minutes) % 24;
-        uint fulfillments = 0;
-        for (uint j = 0; j < dailySchedule[currHour].length; j++) {
-            if (node == dailySchedule[currHour][j]) {
-                fulfillments++;
-            }
-        }
+    function rewardPoSts(address node, uint currDay, uint currHour, bool[] acceptedMicroSectors, bool[] rejectedMicroSectors) external {
+        require(msg.sender == proofVerifier, "unauthorized caller");
 
-        return fulfillments;
+        uint fulfillments = acceptedMicroSectors.length;
+        recordFulfillments(msg.sender, fulfillments);
+        sendHourlyReward(msg.sender, fulfillments);
+        
+        proofHistory.acceptProofs(node, currDay, currHour, acceptedMicroSectors);
+        proofHistory.rejectProofs(node, currDay, currHour, rejectedMicroSectors);
     }
 
     function recordFulfillments(address node, uint fulfillments) private {
@@ -185,7 +175,7 @@ contract StorageDeal {
         require(msg.sender == owner, "unauthorized caller");
         require(dealStatus == Status.IN_PROGRESS, "storage deal isn't in progress");
         
-        uint totalCommitments = dealDuration * 24 * getNumSegments();
+        uint totalCommitments = dealDuration * 24 * getNumMicroSectors();
         for (uint i = 0; i < dailySchedule.length; i++) {
             for (uint j = 0; j < dailySchedule[i].length; j++) {
                 address node = dailySchedule[i][j];
@@ -199,6 +189,8 @@ contract StorageDeal {
         // We should send these tokens back to the user.
         payable(user).transfer(address(this).balance);
         dealStatus = Status.COMPLETE;
+
+        // TODO @ygao record the fulfillments and commitments in the node registry.
     }
 
     // The final reward for each node is based on the fraction of its fulfillments over the total commitments by all nodes.
@@ -212,5 +204,13 @@ contract StorageDeal {
         require(log.fulfillments < totalCommitments, "individual fulfillments must be fewer than total commitments");
         payable(node).transfer(totalFinalReward * log.fulfillments / totalCommitments);
         log.isParticipant = false;
+    }
+
+    function getCurrHour() pure private returns (uint) {
+        return (block.timestamp / 1000 / 60 seconds / 60 minutes) % 24;
+    }
+
+    function getCurrDay() pure private returns (uint) {
+        return block.timestamp / 1000 / 60 seconds / 60 minutes / 24 hours;
     }
 }
