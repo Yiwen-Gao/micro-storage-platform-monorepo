@@ -8,6 +8,15 @@ Decentralization + democratization.
 ### Setup
 Since `lotus` is a submodule, run
 ```zsh
-git submodule update --init
+git submodule update --init --recursive
 ```
 to initialize and fetch the code.
+
+### Generating Proofs
+Currently supports files of size <= 512MiB
+```zsh
+cd lotus
+make lotus-bench
+./lotus-bench sealData /your/path/file
+./lotus-bench windowPost 1
+```
