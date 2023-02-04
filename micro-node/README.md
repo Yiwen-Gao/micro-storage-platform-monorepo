@@ -1,6 +1,7 @@
 ### Setup
 ```zsh
 cd lotus
+make clean ; FFI_BUILD_FROM_SOURCE=1 make
 make lotus-bench
 ```
 
