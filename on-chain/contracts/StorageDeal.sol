@@ -58,7 +58,7 @@ contract StorageDeal {
      * @param _hourlySegmentReward tokens to be paid to each node every hour while deal is ongoing
      * @param _totalFinalReward total tokens to be split and paid to all nodes at end of deal
      * @param _dailySchedule matrix of committed nodes for each hour of the day
-     * @param _verifier external contract to validate poRep (proof of replication) and poSts (proof of spacetime)
+     * @param _proofVerifier external contract to validate poRep (proof of replication) and poSts (proof of spacetime)
      * @param poRep initial proof of replication to be validated
      */
     constructor (
@@ -67,7 +67,7 @@ contract StorageDeal {
         uint _hourlySegmentReward, 
         uint _totalFinalReward, 
         address[][24] memory _dailySchedule,
-        address _verifier,
+        address _proofVerifier,
         string memory poRep
     ) payable {
         owner = msg.sender;
@@ -81,6 +81,7 @@ contract StorageDeal {
 
         setParticipants();
         proofHistory = new ProofHistory(poRep, dailySchedule);
+        proofVerifier = _proofVerifier;
     }
 
     function setParticipants() private {
@@ -118,7 +119,7 @@ contract StorageDeal {
     function submitPoSts(string[] memory proofs) external {
         validateOngoingDeal();
         validateNodeCommitmentToHour(msg.sender);
-        proofHistory.recordPoStSubmission(msg.sender, proofs);
+        proofHistory.recordPoStSubmission(msg.sender, getCurrDay(), getCurrHour(), proofs);
     }
 
     function validateOngoingDeal() view private {
@@ -137,7 +138,7 @@ contract StorageDeal {
         require(false, "node isn't committed to the current hour");
     }
 
-    function rewardPoSts(address node, uint currDay, uint currHour, bool[] acceptedMicroSectors, bool[] rejectedMicroSectors) external {
+    function rewardPoSts(address node, uint currDay, uint currHour, uint[] memory acceptedMicroSectors, uint[] memory rejectedMicroSectors) external {
         require(msg.sender == proofVerifier, "unauthorized caller");
 
         uint fulfillments = acceptedMicroSectors.length;
@@ -206,11 +207,11 @@ contract StorageDeal {
         log.isParticipant = false;
     }
 
-    function getCurrHour() pure private returns (uint) {
+    function getCurrHour() view private returns (uint) {
         return (block.timestamp / 1000 / 60 seconds / 60 minutes) % 24;
     }
 
-    function getCurrDay() pure private returns (uint) {
+    function getCurrDay() view private returns (uint) {
         return block.timestamp / 1000 / 60 seconds / 60 minutes / 24 hours;
     }
 }

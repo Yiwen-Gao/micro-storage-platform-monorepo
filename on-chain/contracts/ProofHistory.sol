@@ -57,6 +57,14 @@ contract ProofHistory {
     }
 
     function getProofKey(address node, uint currDay, uint currHour, uint microSector) pure private returns (string memory) {
-        return Strings.toHexString(uint160(node), 20) + "-" + Strings.toString(currDay) + "-" + Strings.toString(currHour) + "-" + Strings.toString(microSector);
+        return string.concat(
+            Strings.toHexString(uint160(node), 20),
+            "-",
+            Strings.toString(currDay),
+            "-",
+            Strings.toString(currHour),
+            "-",
+            Strings.toString(microSector)
+        );
     }
 }
