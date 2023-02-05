@@ -77,7 +77,7 @@ describe("StorageDeal contract", function() {
         const hour2 = await deal.getCurrHour();
         await expect(deal.connect(verifier).rewardPoSts(node1.address, day2, hour2, [1], [])).to.changeEtherBalance(node1, oneEth.toString());
         await expect(deal.connect(verifier).rewardPoSts(node2.address, day2, hour2, [2], [])).to.changeEtherBalance(node2, oneEth.toString());
-        // TODO @ygao readd user account balance assertions.
+        // TODO @ygao re-add user account balance assertions.
         // const payment = oneEth.mul(30).div(360).add(3);
         await expect(deal.endDeal()).to.changeEtherBalances(
             [
