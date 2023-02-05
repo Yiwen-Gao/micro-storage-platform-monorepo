@@ -6,8 +6,14 @@ const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 const registry = new ethers.Contract(REGISTRY_ADDRESS, REGISTRY_ABI, wallet);
 
 async function activateNode(address) {
-    await registry.activateNode(address);
+    try {
+        await registry.activateNode(address);
+        console.log(`Node with address ${address} activated successfully`);
+    } catch (error) {
+        console.error(`Error activating node: ${error.stack}`);
+    }
 }
+
 
 async function getRating(address) {
     return await registry.getRating(address);
