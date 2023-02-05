@@ -12,4 +12,7 @@ This currently supports files of size <= 512MiB.
 ./lotus-bench windowPost 1
 ```
 
-
+### Submitting Proofs on Chain
+```zsh
+node submit-posts.js --contract-address=<address> --private-key=<key> --proof-paths=<p1>,<p2>,<p3>
+```

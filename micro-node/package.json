@@ -1,0 +1,15 @@
+{
+  "name": "micro-node",
+  "version": "1.0.0",
+  "description": "```zsh cd lotus make clean ; FFI_BUILD_FROM_SOURCE=1 make make lotus-bench ```",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "ethers": "^5.7.2",
+    "yargs": "^17.6.2"
+  }
+}

@@ -1,7 +1,7 @@
 const ethers = require("ethers");
 const { HYPERSPACE_RPC_URL, REGISTRY_ADDRESS, REGISTRY_ABI } = require("./constants");
 
-const provider =  new ethers.providers.JsonRpcProvider(HYPERSPACE_RPC_URL) ;
+const provider =  new ethers.providers.JsonRpcProvider(HYPERSPACE_RPC_URL);
 const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 const registry = new ethers.Contract(REGISTRY_ADDRESS, REGISTRY_ABI, wallet);
 
