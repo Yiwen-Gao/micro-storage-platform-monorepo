@@ -17,7 +17,12 @@ This currently supports files of size <= 512MiB.
 node submit-posts.js \
     --contract-address=<address> \
     --private-key=<key> \
-    --sectors=<s1>,<s2>,<s3> \
-    --comm-rs=<c1>,<c2>,<c3> \
-    --proof-files=<p1>,<p2>,<p3>
+    --sectors=<a>,<b>,<c> \
+    --comm-rs=<d>,<e>,<f> \
+    --proof-files=<g>,<h>,<i>
+```
+
+### Verifying Proofs and Posting Results on Chain
+```zsh
+node verify-posts.js --contract-address=<address> --private-key=<key>
 ```
