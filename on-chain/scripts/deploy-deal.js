@@ -34,7 +34,7 @@ main(
     ethers.utils.parseEther("1"),
     ethers.utils.parseEther("1").mul(10),
     [...Array(24).keys()].map(() => ["0xbcb8E197F783E2aE4B3f3b6358B582a9692f9F85"]),
-    "0x4c64aCa843786FA0FD9E90a94112435F9C56F41F",
+    "0xbcb8E197F783E2aE4B3f3b6358B582a9692f9F85",
     "",
 )
     .then(() => process.exit(0))
