@@ -1,16 +1,7 @@
-/* mongodb username: micronodeserver pwd: windowpost
-mongodb + srv://micronodeserver:windowpost@micronodedb.qlphatj.mongodb.net/test */
-
-/* install 
-npm install uuid
-npm install mongodb 
-npm install ethers
-*/
-
 const express = require("express");
 const { MongoClient } = require("mongodb");
 const { v4: uuid } = require('uuid');
-const ethers = require('ethers');
+const { getRating } = require("./micro-node-registry");
 
 const app = express();
 app.use(express.json());
