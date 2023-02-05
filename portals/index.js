@@ -1,7 +1,7 @@
 const express = require("express");
 const { MongoClient } = require("mongodb");
 const { v4: uuid } = require('uuid');
-const { getRating } = require("./micro-node-registry");
+const {  activateNode, getRating, getWeightedRating, } = require("./micro-node-registry");
 
 const app = express();
 app.use(express.json());
@@ -30,19 +30,7 @@ app.post("/registerNode", async (req, res) => {
       await nodes.insertOne(node);
       console.log(`Node with ID ${id} registered successfully`);
 
-      // Set the private key for the wallet
-      const privateKey = "0x20eeece9ab6ed39bb64e3fddf06c4c3f7758b34191c23415e69bf48df9cbb61a";
-      const wallet = new ethers.Wallet(privateKey, ethers.provider);
-      const signer = wallet.connect(ethers.provider);
-
-      // Load the smart contract JSON
-      const contractJson = require('./MicroNodeRegistry.json');
-
-      // Create an instance of the smart contract
-      const contract = new ethers.Contract(contractJson.address, contractJson.abi, signer);
-
-      // Call the activateNode function on the smart contract
-      await contract.activateNode(req.body.walletAddress);
+      activateNode(req.body.walletAddress);
   
       res.status(201).send({ id: node.id, message: "Node registered successfully" });
     } catch (error) {
