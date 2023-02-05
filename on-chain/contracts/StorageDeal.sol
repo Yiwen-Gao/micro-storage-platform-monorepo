@@ -25,18 +25,18 @@ contract StorageDeal {
     // The outer array contains 24 inner arrays, one for each hour of the day.
     // An inner array represents how the data is divided between the nodes for the hour.
     // (Each inner array should be the same length, but this will differ for different storage deals based on the user's data size.)
-    // If the same node appears in an inner array multiple times, that means it's committed to multiple micro-sectors of the user's data.
-    // At the moment, each micro-sector is 512MiB, but this may change in the future.
+    // If the same node appears in an inner array multiple times, that means it's committed to multiple sectors of the user's data.
+    // At the moment, each sector is 512MiB, but this may change in the future.
     //
-    // Consider a sample schedule where the user wants to store four micro-sectors of data:
-    // Hour of Day    || mSector 1 | mSector 2 | mSector 3 | mSector 4
+    // Consider a sample schedule where the user wants to store four sectors of data:
+    // Hour of Day    || Sector 1  | Sector 2  | Sector 3  | Sector 4
     // ===============================================================
     // 0 (12AM - 1AM) || node 1    | node 1    | node 1    | node 2
     // 1 (1AM -  2AM) || node 1    | node 2    | node 3    | node 4
     // 2 (2AM -  3AM) || node 2    | node 2    | node 3    | node 4
     // (And so on for the rest of the day...)
     //
-    // For the first hour, node1 is storing three of the four micro-sectors and node2 is storing one.
+    // For the first hour, node1 is storing three of the four sectors and node2 is storing one.
     // If we sum up the commitments for the first three hours, node1: 4, node2: 4, node3 : 2, and node4: 2.
     address[][24] public dailySchedule;
     mapping(address => WorkLog) public participants;
@@ -49,7 +49,7 @@ contract StorageDeal {
     // Some functions can only be called if the deal has a certain status
     Status dealStatus;
 
-    ProofHistory proofHistory;
+    ProofHistory public proofHistory;
     address proofVerifier;
 
     /**
@@ -85,9 +85,9 @@ contract StorageDeal {
     }
 
     function setParticipants() private {
-        uint numMicroSectors = getNumMicroSectors();
+        uint numSectors = getNumSectors();
         for (uint i = 0; i < dailySchedule.length; i++) {
-            require(numMicroSectors == dailySchedule[i].length, "number of micro-sectors needs to be the same per hour");
+            require(numSectors == dailySchedule[i].length, "number of sectors needs to be the same per hour");
             for (uint j = 0; j < dailySchedule[i].length; j++) {
                 address node = dailySchedule[i][j];
                 WorkLog storage log = participants[node];
@@ -97,17 +97,17 @@ contract StorageDeal {
         }
     }
 
-    function getNumMicroSectors() view private returns (uint) {
-        uint numMicroSectors = dailySchedule[0].length;
-        require(numMicroSectors > 0, "need at least one segment per hour");
-        return numMicroSectors;
+    function getNumSectors() view private returns (uint) {
+        uint numSectors = dailySchedule[0].length;
+        require(numSectors > 0, "need at least one segment per hour");
+        return numSectors;
     }
 
     function startDeal() external payable {
         require(msg.sender == user, "unauthorized caller");
         require(dealStatus == Status.PENDING, "storage deal isn't pending");
 
-        uint totalDailyReward = 24 * hourlySegmentReward * getNumMicroSectors();
+        uint totalDailyReward = 24 * hourlySegmentReward * getNumSectors();
         uint totalReward = (dealDuration * totalDailyReward) + totalFinalReward;
         // TODO we may want to take gas into account too.
         require(msg.value >= totalReward, "insufficient tokens to fund deal");
@@ -116,10 +116,10 @@ contract StorageDeal {
         dealStatus = Status.IN_PROGRESS;
     }
 
-    function submitPoSts(string[] memory proofs) external {
+    function submitPoSts(uint[] memory sectors, string[] memory commRs, string[] memory proofs) external {
         validateOngoingDeal();
         validateNodeCommitmentToHour(msg.sender);
-        proofHistory.recordPoStSubmission(msg.sender, getCurrDay(), getCurrHour(), proofs);
+        proofHistory.recordPoStSubmission(msg.sender, getCurrDay(), getCurrHour(), sectors, commRs, proofs);
     }
 
     function validateOngoingDeal() view private {
@@ -138,15 +138,15 @@ contract StorageDeal {
         require(false, "node isn't committed to the current hour");
     }
 
-    function rewardPoSts(address node, uint currDay, uint currHour, uint[] memory acceptedMicroSectors, uint[] memory rejectedMicroSectors) external {
+    function rewardPoSts(address node, uint currDay, uint currHour, uint[] memory acceptedSectors, uint[] memory rejectedSectors) external {
         require(msg.sender == proofVerifier, "unauthorized caller");
 
-        uint fulfillments = acceptedMicroSectors.length;
+        uint fulfillments = acceptedSectors.length;
         recordFulfillments(node, fulfillments);
         sendHourlyReward(node, fulfillments);
         
-        proofHistory.acceptProofs(node, currDay, currHour, acceptedMicroSectors);
-        proofHistory.rejectProofs(node, currDay, currHour, rejectedMicroSectors);
+        proofHistory.acceptProofs(node, currDay, currHour, acceptedSectors);
+        proofHistory.rejectProofs(node, currDay, currHour, rejectedSectors);
     }
 
     function recordFulfillments(address node, uint fulfillments) private {
@@ -177,7 +177,7 @@ contract StorageDeal {
         require(msg.sender == owner, "unauthorized caller");
         require(dealStatus == Status.IN_PROGRESS, "storage deal isn't in progress");
         
-        uint totalCommitments = dealDuration * 24 * getNumMicroSectors();
+        uint totalCommitments = dealDuration * 24 * getNumSectors();
         for (uint i = 0; i < dailySchedule.length; i++) {
             for (uint j = 0; j < dailySchedule[i].length; j++) {
                 address node = dailySchedule[i][j];
