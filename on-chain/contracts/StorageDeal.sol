@@ -142,8 +142,8 @@ contract StorageDeal {
         require(msg.sender == proofVerifier, "unauthorized caller");
 
         uint fulfillments = acceptedMicroSectors.length;
-        recordFulfillments(msg.sender, fulfillments);
-        sendHourlyReward(msg.sender, fulfillments);
+        recordFulfillments(node, fulfillments);
+        sendHourlyReward(node, fulfillments);
         
         proofHistory.acceptProofs(node, currDay, currHour, acceptedMicroSectors);
         proofHistory.rejectProofs(node, currDay, currHour, rejectedMicroSectors);
@@ -155,6 +155,7 @@ contract StorageDeal {
 
     // TODO instead of paying per hour, we can consider paying per day to save on gas?
     function sendHourlyReward(address node, uint fulfillments) private {
+        console.log("sendHourlyReward", fulfillments * hourlySegmentReward);
         payable(node).transfer(fulfillments * hourlySegmentReward);
     }
 
@@ -207,11 +208,12 @@ contract StorageDeal {
         log.isParticipant = false;
     }
 
-    function getCurrHour() view private returns (uint) {
-        return (block.timestamp / 1000 / 60 seconds / 60 minutes) % 24;
+    // getCurrDay() and getCurrHour() are helper functions.
+    function getCurrDay() view public returns (uint) {
+        return block.timestamp / 1000 / 60 seconds / 60 minutes / 24 hours;
     }
 
-    function getCurrDay() view private returns (uint) {
-        return block.timestamp / 1000 / 60 seconds / 60 minutes / 24 hours;
+    function getCurrHour() view public returns (uint) {
+        return (block.timestamp / 1000 / 60 seconds / 60 minutes) % 24;
     }
 }

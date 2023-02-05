@@ -6,9 +6,7 @@ describe("StorageDeal contract", function() {
     const oneEth = ethers.utils.parseEther("1");
 
     async function deploy() {
-        const [owner, user, node1, node2, node3] = await ethers.getSigners();
-        const ProofVerifier = await ethers.getContractFactory("ProofVerifier");
-        const verifier = await ProofVerifier.deploy();
+        const [owner, user, verifier, node1, node2, node3] = await ethers.getSigners();
         const StorageDeal = await ethers.getContractFactory("StorageDeal");
         const deal = await StorageDeal.deploy(
             user.address,
@@ -25,7 +23,7 @@ describe("StorageDeal contract", function() {
         await expect(deal.startDeal({ value: totalReward })).to.be.reverted;
         await deal.connect(user).startDeal({ value: totalReward });
 
-        return { deal, owner, user, node1, node2, node3, totalReward };
+        return { deal, owner, user, verifier, node1, node2, node3, totalReward };
     }
 
     it("should set up and start deal", async function() {
@@ -41,9 +39,12 @@ describe("StorageDeal contract", function() {
     });
 
     it("should accept poSt", async function() {
-        const { deal, node1 } = await loadFixture(deploy);
+        const { deal, verifier, node1 } = await loadFixture(deploy);
 
-        await expect(deal.connect(node1).submitPoSt("")).to.changeEtherBalance(node1, oneEth.toString());
+        await deal.connect(node1).submitPoSts([""]);
+        const day = await deal.getCurrDay();
+        const hour = await deal.getCurrHour();
+        await expect(deal.connect(verifier).rewardPoSts(node1.address, day, hour, [0], [])).to.changeEtherBalance(node1, oneEth.toString());
         const log = await deal.participants(node1.address);
         expect(log.isParticipant).to.be.true;
         expect(log.fulfillments).to.equal(1);
@@ -51,13 +52,21 @@ describe("StorageDeal contract", function() {
     });
 
     it("should end deal", async function() {
-        const { deal, user, node1, node2, node3, totalReward } = await loadFixture(deploy);
+        const { deal, user, verifier, node1, node2, node3, totalReward } = await loadFixture(deploy);
 
-        await expect(deal.connect(node1).submitPoSt("")).to.changeEtherBalance(node1, oneEth.toString());
+        await deal.connect(node1).submitPoSts([""]);
+        const day1 = await deal.getCurrDay();
+        const hour1 = await deal.getCurrHour();
+        await expect(deal.connect(verifier).rewardPoSts(node1.address, day1, hour1, [0], [])).to.changeEtherBalance(node1, oneEth.toString());
         // Increase the time by an hour.
         await time.increase(60 * 60);
-        await expect(deal.connect(node1).submitPoSt("")).to.changeEtherBalance(node1, oneEth.toString());
-        await expect(deal.connect(node2).submitPoSt("")).to.changeEtherBalance(node2, oneEth.toString());
+        await deal.connect(node1).submitPoSts([""]);
+        await deal.connect(node2).submitPoSts([""]);
+
+        const day2 = await deal.getCurrDay();
+        const hour2 = await deal.getCurrHour();
+        await expect(deal.connect(verifier).rewardPoSts(node1.address, day2, hour2, [0], [])).to.changeEtherBalance(node1, oneEth.toString());
+        await expect(deal.connect(verifier).rewardPoSts(node2.address, day2, hour2, [1], [])).to.changeEtherBalance(node2, oneEth.toString());
         // TODO @ygao readd user account balance assertions.
         // const payment = oneEth.mul(30).div(360).add(3);
         await expect(deal.endDeal()).to.changeEtherBalances(
@@ -65,7 +74,8 @@ describe("StorageDeal contract", function() {
                 // user, 
                 node1, 
                 node2, 
-                node3],
+                node3,
+            ],
             [
                 // totalReward.sub(payment).toString(), 
                 oneEth.mul(20).div(360).toString(), 
