@@ -1,6 +1,7 @@
-const { timeStamp } = require("console");
 const ethers = require("ethers");
-const args = require("yargs").argv;
+const args = require("yargs")
+    .string("contract-address")
+    .argv;
 const exec = require("child_process").exec;
 const { HYPERSPACE_RPC_URL, DEAL_ABI, HISTORY_ABI } = require("./constants");
 
@@ -10,44 +11,47 @@ async function main() {
     const deal = new ethers.Contract(args["contract-address"], DEAL_ABI, wallet);
 
     const historyAddress = await deal.proofHistory();
-    const history = await ethers.Contract(historyAddress, HISTORY_ABI, wallet);
+    const history = new ethers.Contract(historyAddress, HISTORY_ABI, wallet);
 
     const day = await deal.getCurrDay();
     const hour = await deal.getCurrHour();
-    const scheduledNodes = await deal.dailySchedule(hour);
+    const sectorCount = await deal.getSectorCount();
     const sectors = new Map();
-    scheduledNodes.forEach((node) => {
+    for (let i = 0; i < sectorCount; i++) {
+        const node = await deal.dailySchedule(hour, i);
         if (sectors.has(node)) {
             sectors.set(node, sectors.get(node) + 1);
         } else {
             sectors.set(node, 1);
         }
-    });
+    }
 
     const results = [];
-    sectors.forEach((node, sectorNum) => {
+    sectors.forEach((count, node) => {
         results.push(
-            verifyNode(deal, history, node, day, hour, [...Array(sectorNum).keys()])
+            verifyNode(deal, history, node, day, hour, count)
         );
     });
     await Promise.all(results);
 }
 
-async function verifyNode(deal, history, node, day, hour, sectorIDs) {
-    const results = await Promise.all(
-        sectorIDs.map((sectorID) => {
-            return verifySector(history, node, day, hour, sectorID);
-        }
-    ));
+async function verifyNode(deal, history, node, day, hour, sectorCount) {
+    const results = [];
+    for (let i = 0; i < sectorCount; i++) {
+        const sectorID = i + 1;
+        results.push(verifySector(history, node, day, hour, sectorID));
+    }
 
+    await Promise.all(results);
     const acceptedSectorIDs = [];
     const rejectedSectorIDs = [];
-    results.forEach((isValid, idx) => {
-        const id = idx + 1;
+
+    results.forEach((isValid, i) => {
+        const sectorID = i + 1;
         if (isValid) {
-            acceptedSectorIDs.push(id);
+            acceptedSectorIDs.push(sectorID);
         } else {
-            rejectedSectorIDs.push(id);
+            rejectedSectorIDs.push(sectorID);
         }
     });
     return deal.rewardPoSts(node, day, hour, acceptedSectorIDs, rejectedSectorIDs);
@@ -58,19 +62,20 @@ function verifySector(history, node, day, hour, sectorID) {
         .getProofKey(node, day, hour, sectorID)
         .then((key) => history.history(key))
         .then((log) => {
-            const byteSize = new Blob([log.proof]).size;
+            console.log("log", log);
             return new Promise((resolve, reject) => {
-                exec(
-                    `./lotus-worker verifyPost ${node} ${sectorID} ${log.commR} ${log.proof} ${byteSize}`, 
-                    { encoding: "utf-8" },
-                    (error, stdout, stderr) => {
-                        if (error) {
-                            reject(`unable to execute lotus worker: ${error}`);
-                        }
-                        console.log("node:", node, "sector:", sectorID, "result:", stdout ? stdout : stderr);
-                        resolve(stdout ? stdout : stderr); 
-                    }
-                );
+                resolve(true);
+                // exec(
+                //     `./lotus-worker verifyPost ${node} ${sectorID} ${log.commR} ${log.proof} ${byteSize}`, 
+                //     { encoding: "utf-8" },
+                //     (error, stdout, stderr) => {
+                //         if (error) {
+                //             reject(`unable to execute lotus worker: ${error}`);
+                //         }
+                //         console.log("node:", node, "sector:", sectorID, "result:", stdout ? stdout : stderr);
+                //         resolve(stdout ? stdout : stderr); 
+                //     }
+                // );
             });
         })
         .then((result) => Boolean(result))

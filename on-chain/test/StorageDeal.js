@@ -47,31 +47,32 @@ describe("StorageDeal contract", function() {
         const ProofHistory = await ethers.getContractFactory("ProofHistory");
         const history = await ProofHistory.attach(address);
 
-        await deal.connect(node1).submitPoSts([1], ["commR"], ["proof"]);
+        await deal.connect(node1).submitPoSts([1], ["commR"], [123], ["proof"]);
+        const key = await history.getProofKey(node1.address, day, hour, 1);
+        const proofLog = await history.history(key);
+        expect(proofLog.sector).to.equal(1);
+        expect(proofLog.commR).to.equal("commR");
+        expect(proofLog.proofNum).to.equal(123);
+        expect(proofLog.proofBytes).to.equal("proof");
+
         await expect(deal.connect(verifier).rewardPoSts(node1.address, day, hour, [1], [])).to.changeEtherBalance(node1, oneEth.toString());
         const workLog = await deal.participants(node1.address);
         expect(workLog.isParticipant).to.be.true;
         expect(workLog.fulfillments).to.equal(1);
         expect(workLog.commitments).to.equal(120);
-
-        const key = await history.getProofKey(node1.address, day, hour, 1);
-        const proofLog = await history.history(key);
-        expect(proofLog.sector).to.equal(1);
-        expect(proofLog.commR).to.equal("commR");
-        expect(proofLog.proof).to.equal("proof");
     });
 
     it("should end deal", async function() {
         const { deal, user, verifier, node1, node2, node3, totalReward } = await loadFixture(deploy);
 
-        await deal.connect(node1).submitPoSts([1], ["commR"], ["proof"]);
+        await deal.connect(node1).submitPoSts([1], ["commR"], [123], ["proof"]);
         const day1 = await deal.getCurrDay();
         const hour1 = await deal.getCurrHour();
         await expect(deal.connect(verifier).rewardPoSts(node1.address, day1, hour1, [1], [])).to.changeEtherBalance(node1, oneEth.toString());
         // Increase the time by an hour.
         await time.increase(60 * 60);
-        await deal.connect(node1).submitPoSts([1], ["commR"], ["proof"]);
-        await deal.connect(node2).submitPoSts([2], ["commR"], ["proof"]);
+        await deal.connect(node1).submitPoSts([1], ["commR"], [456], ["proof"]);
+        await deal.connect(node2).submitPoSts([2], ["commR"], [789], ["proof"]);
 
         const day2 = await deal.getCurrDay();
         const hour2 = await deal.getCurrHour();

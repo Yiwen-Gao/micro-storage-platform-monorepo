@@ -19,7 +19,8 @@ node submit-posts.js \
     --private-key=<key> \
     --sectors=<a>,<b>,<c> \
     --comm-rs=<d>,<e>,<f> \
-    --proof-files=<g>,<h>,<i>
+    --proofs=<g>,<h>,<i>
+    --bytes=<j>,<k>,<l>
 ```
 
 ### Verifying Proofs and Posting Results on Chain
