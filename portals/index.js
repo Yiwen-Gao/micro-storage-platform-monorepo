@@ -56,39 +56,50 @@ app.post("/registerNode", async (req, res) => {
 
   app.use(bodyParser.raw({ type: "application/octet-stream" }));
   app.post('/allocateStorage',async (req, res) => {
+    let nodesArray = []
     try {
-      const nodesArray = await nodes.find({}).toArray();
+      nodesArray = await nodes.find({}).toArray();
       console.log(`Retrieved ${nodesArray.length} nodes successfully`);
       res.status(200).json(nodesArray);
     } catch (error) {
       console.error("Error getting nodes: ", error);
       res.status(500).send("Error getting nodes");
     }
-  
-      let requestedStorage = req.query.storage;
-      let requestedFromTime = req.query.fromtime;
-      let requestedToTime = req.query.totime;
-      let requestedFromDate = req.query.fromdate;
-      let requestedToDate = req.query.todate;
-      let userAddress = req.query.address;
-      let hourlySegmentReward = req.query.hourlySegmentReward;
-      let totalFinalReward = req.query.totalFinalReward;
-      const fileBytes = req.body;
-      const dealDuration = findDaysBetweenDates(requestedFromDate,requestedToDate);
 
-      const findDaysBetweenDates = (startDate, endDate) => {
-        const start = new Date(requestedFromDate);
-        const end = new Date(requestedToDate);
-        const timeDiff = Math.abs(end.getTime() - start.getTime());
-        return Math.ceil(timeDiff / (1000 * 3600 * 24));
-    }
-    
+    const findDaysBetweenDates = (startDate, endDate) => {
+      const start = new Date(requestedFromDate);
+      const end = new Date(requestedToDate);
+      const timeDiff = Math.abs(end.getTime() - start.getTime());
+      return Math.ceil(timeDiff / (1000 * 3600 * 24));
+  }
+
+  function addOneDay(dateString) {
+    let date = new Date(dateString);
+    date.setDate(date.getDate() + 1);
+    return date.toISOString().split('T')[0];
+  }
   
+      let requestedStorage = req.get("storage");
+      let requestedFromTime = req.get("requestedFromTime");
+      let requestedEndTime = req.get("requestedToTime");
+      let requestedFromDate = req.get("requestedFromDate");
+      let requestedToDate = req.get("requestedToDate");
+      let userAddress = req.get("userAddress");
+      let hourlySegmentReward = req.get("hourlySegmentReward");
+      let totalFinalReward = req.get("totalFinalReward");
+      const fileBytes = Array.from(req.body);
+      const dealDuration = findDaysBetweenDates(requestedFromDate,requestedToDate);
+      console.log("requestedFromDate",requestedFromDate);
+      const startDate = new Date(requestedFromDate);
+      const endDate = new Date(requestedToDate);
+      let startTime = Date.parse("1970-01-01T" + requestedFromTime);
+      let endTime = Date.parse("1970-01-01T" + requestedEndTime);
+
       //filter nodes based on start,end date and time 
-      const availableNodes = nodesArray.filter(node => node.availability.startDate <= requestedFromDate && 
-          node.availability.endDate >= requestedEndDate && node.availability.startTime <= requestedFromTime && node.availability.endTime >= requestedEndTime && 
-          storageAmount >= 2);
-  
+      const availableNodes = nodesArray.filter(node => new Date(node.availability.startDate) <= startDate && 
+          new Date(node.availability.endDate) >= endDate  && 
+          parseInt(node.storageAmount) >= 2);
+
         // Sort nodes based on rating from smart contract
         availableNodes.sort((a, b) => {
               const aRating =  getRating(a.id);
@@ -105,19 +116,22 @@ app.post("/registerNode", async (req, res) => {
       }
     });
     const sectorSize = 512 * 1024 * 1024; // size of each sector in Bytes
-    const sectorsNum = Math.ceil(storage * 1024 * 1024 * 1024 / sectorSize); // number of sectors required
-
+    const sectorsNum = Math.ceil(requestedStorage * 1024 * 1024 * 1024 / sectorSize); // number of sectors required
+    console.log(sectorsNum);
     // Create the 2D array for allocation
     let allocationArray = [];
     for (let i = 0; i < 24; i++) {
-      allocationArray[i] = new Array(sectorsNum);
+      allocationArray[i] = [];
+      for(let j=0; j< sectorsNum; j++ ) {
+        allocationArray[i][j] = "";
+      }
     }
 
     //chosen nodes 
     let chosenNodes = [];
   
     //data in bytes to be sent to each node 
-    let chunks = [][sectorsNum];
+    let chunks = [];
     let i=0;
     let dataLeft = requestedStorage;
   
@@ -129,14 +143,16 @@ app.post("/registerNode", async (req, res) => {
           if (!availableNodes[nodeIndex].storageAmount) {
               nodeIndex++;
             }
-            if ((availableNodes[nodeIndex].storageAmount) * 1024 * 1024 * 1024 >= (4 * segmentSize)) {
+            if ((availableNodes[nodeIndex].storageAmount) * 1024 * 1024 * 1024 >= (4 * sectorSize)) {
+               let innerArray = Array(sectorsNum).fill(0);
                 for (let segment = 0; segment < sectorsNum; segment++) {
                     allocationArray[hour][segment] = availableNodes[nodeIndex].walletAddress;
                     chosenNodes.push(availableNodes[nodeIndex].walletAddress);
                     let start = segment * sectorSize;
                     let end = Math.min(start + sectorSize - 1, fileBytes - 1);
-                    chunks[i].push(fileBytes.slice(start, end + 1));
+                    innerArray.push(fileBytes.slice(start, end + 1));
             }
+            chunks.push(innerArray);
             availableNodes[nodeIndex].storageAmount -= 2;
             dataLeft-= 2;
             nodeIndex++;
@@ -160,7 +176,7 @@ app.post("/registerNode", async (req, res) => {
 
     try {
       await nodes.bulkWrite(updatedNodes);
-      console.log("Node ratings updated successfully");
+      console.log("Node storage updated successfully");
       } catch (error) {
       console.error("Error updating node ratings: ${error.stack}");
       }
