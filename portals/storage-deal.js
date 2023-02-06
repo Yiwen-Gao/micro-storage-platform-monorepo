@@ -43,10 +43,12 @@ async function deploy(
     poRep,
     chosenNodes
 ) {
-    const provider =  new ethers.providers.JsonRpcProvider(HYPERSPACE_RPC_URL) ;
+    const provider =  new ethers.providers.JsonRpcProvider(HYPERSPACE_RPC_URL);
     const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+    console.log("wallet")
     const StorageDeal = new ethers.ContractFactory(DEAL_ABI, DEAL_BYTECODE, wallet);
-    const res =  await StorageDeal.deploy(
+    console.log("here");
+    const res = await StorageDeal.deploy(
         userAddress, 
         dealDuration,
         hourlySegmentReward, 
@@ -55,10 +57,11 @@ async function deploy(
         verifier,
         poRep,
     );
+    console.log("res");
 
-    const body = ```User: ${userAddress}\nDeal Duration: ${dealDuration}\nHourly Segment Reward ${hourlySegmentReward}\nTotal Final Reward ${totalFinalReward}```
+    // const body = ```User: ${userAddress}\nDeal Duration: ${dealDuration}\nHourly Segment Reward ${hourlySegmentReward}\nTotal Final Reward ${totalFinalReward}```
 
-    chosenNodes.forEach(node => sendNotification(node, body))
+    // chosenNodes.forEach(node => sendNotification(node, body))
 
     return res;
 }
@@ -66,3 +69,15 @@ async function deploy(
 module.exports = {
     deploy,
 };
+
+// (async function() {
+//     await deploy(
+//         "0xbcb8E197F783E2aE4B3f3b6358B582a9692f9F85",
+//         1,
+//         100,
+//         ethers.utils.parseEther("1"),
+//         [...Array(24).keys()].map(() => ["0xbcb8E197F783E2aE4B3f3b6358B582a9692f9F85"]),
+//         "0xbcb8E197F783E2aE4B3f3b6358B582a9692f9F85",
+//         "",
+//     );
+// })();
