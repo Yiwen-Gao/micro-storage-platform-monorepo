@@ -3,6 +3,7 @@ const { MongoClient } = require("mongodb");
 const { v4: uuid } = require('uuid');
 const {  activateNode, getRating, getWeightedRating, } = require("./micro-node-registry");
 const {  deploy } = require("./storage-deal");
+const bodyParser = require("body-parser");
 const app = express();
 app.use(express.json());
 
@@ -39,17 +40,21 @@ app.post("/registerNode", async (req, res) => {
     }
 });
 
-  app.get("/nodes", async (req, res) => {
+  //connect to the collection TemporaryData 
+  const temp = db.collection("TemporaryData");
+  app.get("/getData", async (req, res) => {
     try {
-      const nodesArray = await nodes.find({}).toArray();
-      console.log(`Retrieved ${nodesArray.length} nodes successfully`);
-      res.status(200).json(nodesArray);
+      const walletAddress = req.query.walletAddress;
+      const nodeData = await temp.find({ id: walletAddress }).toArray();
+      console.log(`Retrieved  data for Node address: ${walletAddress} successfully`);
+      res.status(200).json(nodeData);
     } catch (error) {
       console.error("Error getting nodes: ", error);
       res.status(500).send("Error getting nodes");
     }
   });
 
+  app.use(bodyParser.raw({ type: "application/octet-stream" }));
   app.post('/allocateStorage',async (req, res) => {
     try {
       const nodesArray = await nodes.find({}).toArray();
@@ -68,6 +73,7 @@ app.post("/registerNode", async (req, res) => {
       let userAddress = req.query.address;
       let hourlySegmentReward = req.query.hourlySegmentReward;
       let totalFinalReward = req.query.totalFinalReward;
+      const fileBytes = req.body;
       const dealDuration = findDaysBetweenDates(requestedFromDate,requestedToDate);
 
       const findDaysBetweenDates = (startDate, endDate) => {
@@ -80,7 +86,8 @@ app.post("/registerNode", async (req, res) => {
   
       //filter nodes based on start,end date and time 
       const availableNodes = nodesArray.filter(node => node.availability.startDate <= requestedFromDate && 
-          node.availability.endDate >= requestedEndDate && node.availability.startTime <= requestedFromTime && node.availability.endTime >= requestedEndTime);
+          node.availability.endDate >= requestedEndDate && node.availability.startTime <= requestedFromTime && node.availability.endTime >= requestedEndTime && 
+          storageAmount >= 2);
   
         // Sort nodes based on rating from smart contract
         availableNodes.sort((a, b) => {
@@ -97,37 +104,47 @@ app.post("/registerNode", async (req, res) => {
                   return bFullfillmentHours - aFullfillmentHours;
       }
     });
-    const segmentSize = 512; // size of each segment in MiB
-    const segments = Math.ceil(storage * 1024 / segmentSize); // number of segments required
-  
+    const sectorSize = 512 * 1024 * 1024; // size of each sector in Bytes
+    const sectorsNum = Math.ceil(storage * 1024 * 1024 * 1024 / sectorSize); // number of sectors required
+
     // Create the 2D array for allocation
     let allocationArray = [];
     for (let i = 0; i < 24; i++) {
-      allocationArray[i] = new Array(segments);
+      allocationArray[i] = new Array(sectorsNum);
     }
 
     //chosen nodes 
     let chosenNodes = [];
   
-    //assigning nodes for each segment , every hour
+    //data in bytes to be sent to each node 
+    let chunks = [][sectorsNum];
+    let i=0;
+    let dataLeft = requestedStorage;
+  
+    //assigning nodes for each sector , every hour
     for (let hour = 0; hour < 24; hour++) {
-      for (let segment = 0; segment < segments; segment++) {
         //iterate through nodes array to find the suitable one
         let nodeIndex = 0;
-        while(nodeIndex < availableNodes.length) {
+        while(nodeIndex < availableNodes.length && dataLeft > 0) {
           if (!availableNodes[nodeIndex].storageAmount) {
               nodeIndex++;
             }
-            if ((availableNodes[nodeIndex].storageAmount) * 1024 >= segmentSize) {
-              allocationArray[hour][segment] = availableNodes[nodeIndex].walletAddress;
-              availableNodes[nodeIndex].storageAmount = ((availableNodes[nodeIndex].storageAmount * 1024) - segmentSize)/1024;
-              chosenNodes.push(availableNodes[nodeIndex].walletAddress);
-              break;
-            } else {
+            if ((availableNodes[nodeIndex].storageAmount) * 1024 * 1024 * 1024 >= (4 * segmentSize)) {
+                for (let segment = 0; segment < sectorsNum; segment++) {
+                    allocationArray[hour][segment] = availableNodes[nodeIndex].walletAddress;
+                    chosenNodes.push(availableNodes[nodeIndex].walletAddress);
+                    let start = segment * sectorSize;
+                    let end = Math.min(start + sectorSize - 1, fileBytes - 1);
+                    chunks[i].push(fileBytes.slice(start, end + 1));
+            }
+            availableNodes[nodeIndex].storageAmount -= 2;
+            dataLeft-= 2;
+            nodeIndex++;
+            i++;
+           } else {
               nodeIndex++;
             }
       }
-    }
   }
   
   //update node storage 
@@ -149,13 +166,26 @@ app.post("/registerNode", async (req, res) => {
       }
 
     //todo: deploy storage deal contract (porep,..)
+    const addressDeployed = await deploy(userAddress,dealDuration,hourlySegmentReward,totalFinalReward,allocationArray,
+      "0xbcb8E197F783E2aE4B3f3b6358B582a9692f9F85","");
 
-    await deploy(userAddress,dealDuration,hourlySegmentReward,totalFinalReward,allocationArray,
-      );
-
-    //todo: send data to chosen nodes (do we send this to all nodes at once ? )
-  
-  });
+    //store data temporarily in mongo db
+    try {
+      for(let i=0;i<chosenNodes.length;i++) {
+        const dataToSend = {
+          id: chosenNodes[i],
+          data: chunks[i],
+          storage_deal_address: addressDeployed
+        }
+      await temp.insertOne(dataToSend);
+      console.log(`Data for node ID ${id} added successfully`);
+    }
+    res.status(201).send({ message: "Data added in DB temporarily" });
+   } catch (error) {
+      console.error(`Error inserting node: ${error.stack}`);
+      res.status(500).send("Error sending data to DB");
+    } 
+  });  
   
 
 const port = process.env.PORT || 5000;
