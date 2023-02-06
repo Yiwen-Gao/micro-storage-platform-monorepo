@@ -85,9 +85,9 @@ contract StorageDeal {
     }
 
     function setParticipants() private {
-        uint numSectors = getNumSectors();
+        uint count = getSectorCount();
         for (uint i = 0; i < dailySchedule.length; i++) {
-            require(numSectors == dailySchedule[i].length, "number of sectors needs to be the same per hour");
+            require(count == dailySchedule[i].length, "number of sectors needs to be the same per hour");
             for (uint j = 0; j < dailySchedule[i].length; j++) {
                 address node = dailySchedule[i][j];
                 WorkLog storage log = participants[node];
@@ -97,17 +97,17 @@ contract StorageDeal {
         }
     }
 
-    function getNumSectors() view private returns (uint) {
-        uint numSectors = dailySchedule[0].length;
-        require(numSectors > 0, "need at least one segment per hour");
-        return numSectors;
+    function getSectorCount() view public returns (uint) {
+        uint count = dailySchedule[0].length;
+        require(count > 0, "need at least one sector per hour");
+        return count;
     }
 
     function startDeal() external payable {
         require(msg.sender == user, "unauthorized caller");
         require(dealStatus == Status.PENDING, "storage deal isn't pending");
 
-        uint totalDailyReward = 24 * hourlySegmentReward * getNumSectors();
+        uint totalDailyReward = 24 * hourlySegmentReward * getSectorCount();
         uint totalReward = (dealDuration * totalDailyReward) + totalFinalReward;
         // TODO we may want to take gas into account too.
         require(msg.value >= totalReward, "insufficient tokens to fund deal");
@@ -116,10 +116,10 @@ contract StorageDeal {
         dealStatus = Status.IN_PROGRESS;
     }
 
-    function submitPoSts(uint[] memory sectors, string[] memory commRs, string[] memory proofs) external {
+    function submitPoSts(uint[] memory sectors, string[] memory commRs, uint[] memory proofNums, string[] memory proofBytes) external {
         validateOngoingDeal();
         validateNodeCommitmentToHour(msg.sender);
-        proofHistory.recordPoStSubmission(msg.sender, getCurrDay(), getCurrHour(), sectors, commRs, proofs);
+        proofHistory.recordPoStSubmission(msg.sender, getCurrDay(), getCurrHour(), sectors, commRs, proofNums, proofBytes);
     }
 
     function validateOngoingDeal() view private {
@@ -177,7 +177,7 @@ contract StorageDeal {
         require(msg.sender == owner, "unauthorized caller");
         require(dealStatus == Status.IN_PROGRESS, "storage deal isn't in progress");
         
-        uint totalCommitments = dealDuration * 24 * getNumSectors();
+        uint totalCommitments = dealDuration * 24 * getSectorCount();
         for (uint i = 0; i < dailySchedule.length; i++) {
             for (uint j = 0; j < dailySchedule[i].length; j++) {
                 address node = dailySchedule[i][j];

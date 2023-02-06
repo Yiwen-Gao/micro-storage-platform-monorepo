@@ -3,6 +3,7 @@
 pragma solidity >=0.7.0 <0.9.0;
 
 import "@openzeppelin/contracts/utils/Strings.sol";
+import "hardhat/console.sol";
 
 contract ProofHistory {
     enum Status { UNVERIFIED, ACCEPTED, REJECTED }
@@ -10,7 +11,8 @@ contract ProofHistory {
         address node;
         uint sector;
         string commR;
-        string proof;
+        uint proofNum;
+        string proofBytes;
         Status status;
     }
 
@@ -27,10 +29,11 @@ contract ProofHistory {
         dailySchedule = _dailySchedule;
     }
 
-    function recordPoStSubmission(address node, uint day, uint hour, uint[] memory sectors, string[] memory commRs, string[] memory proofs) external {
+    function recordPoStSubmission(address node, uint day, uint hour, uint[] memory sectors, string[] memory commRs, uint[] memory proofNums, string[] memory proofBytes) external {
         require(msg.sender == owner, "unauthorized caller");
         require(sectors.length == commRs.length, "sectors and commRs have to be the same length");
-        require(sectors.length == proofs.length, "sectors and proofs have to be the same length");
+        require(sectors.length == proofNums.length, "sectors and proof numbers have to be the same length");
+        require(sectors.length == proofBytes.length, "sectors and proof bytes have to be the same length");
 
         uint scheduledSectors = 0;
         for (uint j = 0; j < dailySchedule[hour].length; j++) {
@@ -42,7 +45,9 @@ contract ProofHistory {
         
         for (uint i = 0; i < sectors.length; i++) {
             string memory key = getProofKey(node, day, hour, sectors[i]);
-            history[key] = ProofLog(node, sectors[i], commRs[i], proofs[i], Status.UNVERIFIED);
+            history[key] = ProofLog(node, sectors[i], commRs[i], proofNums[i], proofBytes[i], Status.UNVERIFIED);
+            console.log(node, day, hour, sectors[i]);
+            console.log(key);
         }
 
         emit poStSubmission(node, day, hour);
