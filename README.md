@@ -6,8 +6,7 @@ This project enables anyone with a personal computer to offer a percentage of th
 Decentralization + democratization. 
 
 ### Setup
-Since `lotus` is a submodule, run
+Initialize all submodules.
 ```zsh
 git submodule update --init --recursive
 ```
-to initialize and fetch the code.
