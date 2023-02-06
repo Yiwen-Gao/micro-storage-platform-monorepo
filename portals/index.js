@@ -31,7 +31,7 @@ app.post("/registerNode", async (req, res) => {
       await nodes.insertOne(node);
       console.log(`Node with ID ${id} registered successfully`);
 
-      await activateNode(req.body.walletAddress);
+      await activateNode(req.body.walletAddress, req.body.privateKey);
   
       res.status(201).send({ id: node.id, message: "Node registered successfully" });
     } catch (error) {
@@ -183,7 +183,7 @@ app.post("/registerNode", async (req, res) => {
 
     //todo: deploy storage deal contract (porep,..)
     const addressDeployed = await deploy(userAddress,dealDuration,hourlySegmentReward,totalFinalReward,allocationArray,
-      "0xbcb8E197F783E2aE4B3f3b6358B582a9692f9F85","");
+      "0xbcb8E197F783E2aE4B3f3b6358B582a9692f9F85","", chosenNodes);
 
     //store data temporarily in mongo db
     try {
