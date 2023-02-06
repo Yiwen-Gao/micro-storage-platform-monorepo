@@ -1,11 +1,13 @@
+const { timeStamp } = require("console");
 const ethers = require("ethers");
 const args = require("yargs").argv;
+const exec = require("child_process").exec;
 const { HYPERSPACE_RPC_URL, DEAL_ABI, HISTORY_ABI } = require("./constants");
 
 async function main() {
     const provider =  new ethers.providers.JsonRpcProvider(HYPERSPACE_RPC_URL);
     const wallet = new ethers.Wallet(args["private-key"], provider);
-    const deal = new ethers.Contract(args["deal-address"], DEAL_ABI, wallet);
+    const deal = new ethers.Contract(args["contract-address"], DEAL_ABI, wallet);
 
     const historyAddress = await deal.proofHistory();
     const history = await ethers.Contract(historyAddress, HISTORY_ABI, wallet);
@@ -53,11 +55,26 @@ async function verifyNode(deal, history, node, day, hour, sectorIDs) {
 
 function verifySector(history, node, day, hour, sectorID) {
     return history
-            .getProofKey(node, day, hour, sectorID)
-            .then((key) => history.history(key))
-            .then((log) => {
-                // TODO call bash script with log contents.
+        .getProofKey(node, day, hour, sectorID)
+        .then((key) => history.history(key))
+        .then((log) => {
+            const byteSize = new Blob([log.proof]).size;
+            return new Promise((resolve, reject) => {
+                exec(
+                    `./lotus-worker verifyPost ${node} ${sectorID} ${log.commR} ${log.proof} ${byteSize}`, 
+                    { encoding: "utf-8" },
+                    (error, stdout, stderr) => {
+                        if (error) {
+                            reject(`unable to execute lotus worker: ${error}`);
+                        }
+                        console.log("node:", node, "sector:", sectorID, "result:", stdout ? stdout : stderr);
+                        resolve(stdout ? stdout : stderr); 
+                    }
+                );
             });
+        })
+        .then((result) => Boolean(result))
+        .catch((error) => console.log("unable to verify sector:", error));
 }
 
 main()

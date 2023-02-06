@@ -210,10 +210,14 @@ contract StorageDeal {
 
     // getCurrDay() and getCurrHour() are helper functions.
     function getCurrDay() view public returns (uint) {
-        return block.timestamp / 1000 / 60 seconds / 60 minutes / 24 hours;
+        uint day = block.timestamp / 60 / 60 / 24;
+        console.log(block.timestamp, day);
+        return day;
     }
 
     function getCurrHour() view public returns (uint) {
-        return (block.timestamp / 1000 / 60 seconds / 60 minutes) % 24;
+        uint hour = (block.timestamp / 60 / 60) % 24;
+        console.log(block.timestamp, hour);
+        return hour;
     }
 }

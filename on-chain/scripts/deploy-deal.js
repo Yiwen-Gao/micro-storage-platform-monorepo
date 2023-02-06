@@ -30,10 +30,10 @@ async function main(
 // NOTE replace the addresses with your own.
 main(
     "0xbcb8E197F783E2aE4B3f3b6358B582a9692f9F85",
-    5,
+    1,
+    100,
     ethers.utils.parseEther("1"),
-    ethers.utils.parseEther("1").mul(10),
-    [...Array(24).keys()].map(() => ["0xbcb8E197F783E2aE4B3f3b6358B582a9692f9F85"]),
+    [...Array(24).keys()].map(() => ["0xbcb8E197F783E2aE4B3f3b6358B582a9692f9F85", "0xbcb8E197F783E2aE4B3f3b6358B582a9692f9F85", "0xbcb8E197F783E2aE4B3f3b6358B582a9692f9F85", "0xbcb8E197F783E2aE4B3f3b6358B582a9692f9F85"]),
     "0xbcb8E197F783E2aE4B3f3b6358B582a9692f9F85",
     "",
 )
