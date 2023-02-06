@@ -64,18 +64,17 @@ function verifySector(history, node, day, hour, sectorID) {
         .then((log) => {
             console.log("log", log);
             return new Promise((resolve, reject) => {
-                resolve(true);
-                // exec(
-                //     `./lotus-worker verifyPost ${node} ${sectorID} ${log.commR} ${log.proof} ${byteSize}`, 
-                //     { encoding: "utf-8" },
-                //     (error, stdout, stderr) => {
-                //         if (error) {
-                //             reject(`unable to execute lotus worker: ${error}`);
-                //         }
-                //         console.log("node:", node, "sector:", sectorID, "result:", stdout ? stdout : stderr);
-                //         resolve(stdout ? stdout : stderr); 
-                //     }
-                // );
+                exec(
+                    `./lotus/lotus-worker verifyPost ${node} ${sectorID} ${log.commR} ${log.proofNum} ${log.proofBytes}`, 
+                    { encoding: "utf-8" },
+                    (error, stdout, stderr) => {
+                        if (error) {
+                            reject(`unable to execute lotus worker: ${error}`);
+                        }
+                        console.log("node:", node, "sector:", sectorID, "result:", stdout ? stdout : stderr);
+                        resolve(stdout ? stdout : stderr); 
+                    }
+                );
             });
         })
         .then((result) => Boolean(result))

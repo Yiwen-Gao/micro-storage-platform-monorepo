@@ -1,0 +1,17 @@
+{
+  "name": "push",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@pushprotocol/restapi": "^0.3.2",
+    "ethers": "^5.7.2",
+    "node-cron": "^3.0.2"
+  }
+}
