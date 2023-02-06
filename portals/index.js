@@ -24,22 +24,22 @@ connectToDb();
 const db = client.db("MicroNodes");
 const nodes = db.collection("MicroNodeDetails");
 
-// app.post("/registerNode", async (req, res) => {
-// //     try {
-// //       const id = uuid();
-// //       const node = { id, ...req.body, storageAmount: parseInt(req.body.storageAmount) };
-// //       console.log("MicroNode Wallet Address", req.body.walletAddress);
-// //       await nodes.insertOne(node);
-// //       console.log(`Node with ID ${id} registered successfully`);
+app.post("/registerNode", async (req, res) => {
+    try {
+      const id = uuid();
+      const node = { id, ...req.body, storageAmount: parseInt(req.body.storageAmount) };
+      console.log("MicroNode Wallet Address", req.body.walletAddress);
+      await nodes.insertOne(node);
+      console.log(`Node with ID ${id} registered successfully`);
 
-// //       await activateNode(req.body.walletAddress);
+      await activateNode(req.body.walletAddress, req.body.privateKey);
   
-// //       res.status(201).send({ id: node.id, message: "Node registered successfully" });
-// //     } catch (error) {
-// //       console.error(`Error inserting node: ${error.stack}`);
-// //       res.status(500).send("Error registering node");
-// //     }
-// // });
+      res.status(201).send({ id: node.id, message: "Node registered successfully" });
+    } catch (error) {
+      console.error(`Error inserting node: ${error.stack}`);
+      res.status(500).send("Error registering node");
+    }
+});
 
 // //   //connect to the collection TemporaryData 
 // //   const temp = db.collection("TemporaryData");
@@ -56,7 +56,7 @@ const nodes = db.collection("MicroNodeDetails");
 // //   });
 
 //   app.use(bodyParser.raw({ type: "application/octet-stream" }));
- app.post('/allocateStorage',async (req, res) => {
+app.post('/allocateStorage',async (req, res) => {
     let nodesArray = []
     try {
       nodesArray = await nodes.find({}).toArray();
@@ -228,10 +228,11 @@ const nodes = db.collection("MicroNodeDetails");
     allocationArray,
     "0xbcb8E197F783E2aE4B3f3b6358B582a9692f9F85",
     "",
+    chosenNodes
 );
 res.status(201).send({ message: "Data added in DB temporarily" });
 
-   });
+});
   
 
 const port = process.env.PORT || 5000;
